@@ -1,0 +1,227 @@
+// Prisma Schema for Zorides - Social Event Platform
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MODEL
+// ============================================
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String   // hashed with bcrypt
+  name          String
+  avatar        String?  // local path
+  bio           String?
+  age           Int?
+  gender        String?  // "male", "female", "other"
+  
+  // Detailed location (V1)
+  state         String?
+  district      String?
+  locality      String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  eventsCreated Event[]
+  groupsCreated AttendantGroup[]
+  groupMemberships GroupMember[]
+  posts         Post[]
+  reactions     Reaction[]
+  comments      Comment[]
+  messagesSent  Message[] @relation("SentMessages")
+  messagesReceived Message[] @relation("ReceivedMessages")
+  
+  // V2 placeholders (not implemented yet)
+  // phoneNumber   String?
+  // phoneVerified Boolean @default(false)
+  // facebookId    String?
+  // instagramId   String?
+  
+  @@index([state, district])
+}
+
+// ============================================
+// EVENT MODEL
+// ============================================
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @db.Text
+  
+  // Detailed location (V1)
+  state       String
+  district    String
+  locality    String
+  venue       String?  // Specific venue/meeting point
+  
+  date        DateTime
+  creatorId   String
+  creator     User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  status      EventStatus @default(OPEN)
+  mediaUrls   String[]    // local file paths (array)
+  
+  groups      AttendantGroup[]
+  posts       Post[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([state, district, date])
+  @@index([creatorId])
+}
+
+enum EventStatus {
+  OPEN
+  FILLED
+  CLOSED
+  CANCELLED
+}
+
+// ============================================
+// ATTENDANT GROUP MODEL (Core Feature)
+// ============================================
+model AttendantGroup {
+  id                  String   @id @default(cuid())
+  eventId             String
+  event               Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  creatorId           String
+  creator             User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  planDescription     String   @db.Text
+  ageMin              Int?
+  ageMax              Int?
+  genderPreference    String?  // "male", "female", "any"
+  rideMode            String?  // "car", "bike", "public_transport", "walking", etc.
+  maxPeople           Int
+  customPreferences   Json?    // dynamic fields added at runtime
+  
+  status              GroupStatus @default(OPEN)
+  
+  members             GroupMember[]
+  messages            Message[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([eventId])
+  @@index([creatorId])
+  @@index([status])
+}
+
+enum GroupStatus {
+  OPEN
+  FILLED
+  CLOSED
+}
+
+// ============================================
+// GROUP MEMBER MODEL
+// ============================================
+model GroupMember {
+  id        String   @id @default(cuid())
+  groupId   String
+  group     AttendantGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    MemberStatus @default(PENDING)
+  joinedAt  DateTime @default(now())
+  
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+enum MemberStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+// ============================================
+// POST MODEL (Social Feed)
+// ============================================
+model Post {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId     String?
+  event       Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  
+  content     String   @db.Text
+  mediaUrls   String[] // local file paths (photos/videos)
+  
+  reactions   Reaction[]
+  comments    Comment[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([eventId])
+  @@index([createdAt])
+}
+
+// ============================================
+// REACTION MODEL
+// ============================================
+model Reaction {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      ReactionType
+  createdAt DateTime @default(now())
+  
+  @@unique([postId, userId])
+  @@index([postId, type])
+}
+
+enum ReactionType {
+  HELP_FIND_FRIEND  // boosts post in feed
+  HIT_ME_UP         // simple like
+}
+
+// ============================================
+// COMMENT MODEL
+// ============================================
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  parentId  String?  // for nested replies (V2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([postId])
+  @@index([userId])
+}
+
+// ============================================
+// MESSAGE MODEL
+// ============================================
+model Message {
+  id          String   @id @default(cuid())
+  senderId    String
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId String?
+  recipient   User?    @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+  groupId     String?
+  group       AttendantGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  
+  content     String   @db.Text
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  @@index([senderId, recipientId])
+  @@index([groupId])
+  @@index([createdAt])
+}
