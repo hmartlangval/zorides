@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// Force dynamic - NO CACHING
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -8,10 +12,10 @@ export async function POST(request: NextRequest) {
       eventId,
       creatorId,
       planDescription,
-      ageMin,
-      ageMax,
       genderPreference,
+      rideOwnership,
       rideMode,
+      groupImage,
       maxPeople,
     } = body;
 
@@ -27,10 +31,10 @@ export async function POST(request: NextRequest) {
         eventId,
         creatorId,
         planDescription,
-        ageMin,
-        ageMax,
         genderPreference,
+        rideOwnership,
         rideMode,
+        groupImage,
         maxPeople,
         status: 'OPEN',
       },

@@ -4,12 +4,16 @@ const nextConfig = {
     remotePatterns: [],
     unoptimized: false,
   },
-  // Disable caching for development (interactive app)
+  // COMPLETELY DISABLE ALL CACHING - This is a real-time social app!
   experimental: {
     staleTimes: {
       dynamic: 0,
       static: 0,
     },
+  },
+  // Disable static optimization
+  generateBuildId: async () => {
+    return 'build-' + Date.now()
   },
 }
 

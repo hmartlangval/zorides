@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// Force dynamic - NO CACHING
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -21,6 +25,11 @@ export async function POST(
       where: { id: params.id },
       include: {
         members: true,
+        event: {
+          select: {
+            title: true,
+          },
+        },
       },
     });
 
@@ -63,12 +72,12 @@ export async function POST(
       );
     }
 
-    // Add member
+    // Add member with INTERESTED status (requires approval)
     const member = await prisma.groupMember.create({
       data: {
         groupId: params.id,
         userId,
-        status: 'ACCEPTED', // Auto-accept for V1
+        status: 'INTERESTED', // V1.1 - Requires approval
       },
       include: {
         user: {
@@ -81,7 +90,19 @@ export async function POST(
       },
     });
 
-    console.log('Member joined:', member);
+    console.log('Member showed interest:', member);
+
+    // Send system notification to group creator
+    await prisma.message.create({
+      data: {
+        senderId: userId, // From the interested user
+        recipientId: group.creatorId,
+        content: `${member.user.name} is interested in your group "${group.event?.title || 'your event'}". Check their profile and accept or message them!`,
+        isSystemMessage: true,
+      },
+    });
+
+    console.log('System notification sent to creator');
 
     // Check if group is now full and update status
     const totalMembers = group.members.length + 1; // +1 for new member

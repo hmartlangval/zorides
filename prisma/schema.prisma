@@ -18,8 +18,11 @@ model User {
   name          String
   avatar        String?  // local path
   bio           String?
+  description   String?  // detailed profile description
+  interests     String?  // comma-separated interests
   age           Int?
   gender        String?  // "male", "female", "other"
+  rideOwnership String?  // "bike", "car", "both", "looking_for_ride"
   
   // Detailed location (V1)
   state         String?
@@ -96,10 +99,10 @@ model AttendantGroup {
   creator             User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   
   planDescription     String   @db.Text
-  ageMin              Int?
-  ageMax              Int?
   genderPreference    String?  // "male", "female", "any"
+  rideOwnership       String?  // "bike", "car", "both", "looking_for_ride" - what rides they own
   rideMode            String?  // "car", "bike", "public_transport", "walking", etc.
+  groupImage          String?  // optional image for the group
   maxPeople           Int
   customPreferences   Json?    // dynamic fields added at runtime
   
@@ -130,7 +133,8 @@ model GroupMember {
   group     AttendantGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    MemberStatus @default(PENDING)
+  status    MemberStatus @default(INTERESTED)
+  message   String?  // optional message when showing interest
   joinedAt  DateTime @default(now())
   
   @@unique([groupId, userId])
@@ -138,7 +142,7 @@ model GroupMember {
 }
 
 enum MemberStatus {
-  PENDING
+  INTERESTED  // V1.1 - User showed interest, awaiting approval
   ACCEPTED
   REJECTED
 }
@@ -209,17 +213,18 @@ model Comment {
 // MESSAGE MODEL
 // ============================================
 model Message {
-  id          String   @id @default(cuid())
-  senderId    String
-  sender      User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  recipientId String?
-  recipient   User?    @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
-  groupId     String?
-  group       AttendantGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  id              String   @id @default(cuid())
+  senderId        String
+  sender          User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId     String?
+  recipient       User?    @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+  groupId         String?
+  group           AttendantGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
   
-  content     String   @db.Text
-  read        Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  content         String   @db.Text
+  isSystemMessage Boolean  @default(false) // V1.1 - for notifications
+  read            Boolean  @default(false)
+  createdAt       DateTime @default(now())
   
   @@index([senderId, recipientId])
   @@index([groupId])

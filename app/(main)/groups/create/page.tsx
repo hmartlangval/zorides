@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
@@ -8,19 +8,19 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 
-export default function CreateGroupPage() {
+function CreateGroupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const eventId = searchParams.get('eventId');
   
   const [formData, setFormData] = useState({
     planDescription: '',
-    ageMin: '',
-    ageMax: '',
     genderPreference: 'any',
+    rideOwnership: '',
     rideMode: '',
     maxPeople: '4',
   });
+  const [groupImage, setGroupImage] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -42,6 +42,24 @@ export default function CreateGroupPage() {
         return;
       }
 
+      // Upload group image if provided
+      let groupImageUrl = null;
+      if (groupImage) {
+        const imageFormData = new FormData();
+        imageFormData.append('files', groupImage);
+        imageFormData.append('folder', 'events');
+
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: imageFormData,
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          groupImageUrl = uploadData.urls[0];
+        }
+      }
+
       const res = await fetch('/api/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -49,10 +67,10 @@ export default function CreateGroupPage() {
           eventId,
           creatorId: userId,
           planDescription: formData.planDescription,
-          ageMin: formData.ageMin ? parseInt(formData.ageMin) : null,
-          ageMax: formData.ageMax ? parseInt(formData.ageMax) : null,
           genderPreference: formData.genderPreference,
+          rideOwnership: formData.rideOwnership || null,
           rideMode: formData.rideMode || null,
+          groupImage: groupImageUrl,
           maxPeople: parseInt(formData.maxPeople),
         }),
       });
@@ -97,26 +115,18 @@ export default function CreateGroupPage() {
               required
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                type="number"
-                label="Min Age (Optional)"
-                value={formData.ageMin}
-                onChange={(e) => setFormData({ ...formData, ageMin: e.target.value })}
-                placeholder="18"
-                min="1"
-                max="100"
-              />
-              <Input
-                type="number"
-                label="Max Age (Optional)"
-                value={formData.ageMax}
-                onChange={(e) => setFormData({ ...formData, ageMax: e.target.value })}
-                placeholder="30"
-                min="1"
-                max="100"
-              />
-            </div>
+            <Select
+              label="Your Ride Ownership"
+              value={formData.rideOwnership}
+              onChange={(e) => setFormData({ ...formData, rideOwnership: e.target.value })}
+              options={[
+                { value: '', label: 'Not specified' },
+                { value: 'bike', label: '🏍️ I have a Bike' },
+                { value: 'car', label: '🚗 I have a Car' },
+                { value: 'both', label: '🚗🏍️ I have Both' },
+                { value: 'looking_for_ride', label: '🙋 Looking for a Ride' },
+              ]}
+            />
 
             <Select
               label="Gender Preference"
@@ -154,9 +164,22 @@ export default function CreateGroupPage() {
               required
             />
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Group Image (Optional)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setGroupImage(e.target.files?.[0] || null)}
+                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+              />
+              <p className="text-xs text-gray-500 mt-1">Add a photo to make your group more appealing!</p>
+            </div>
+
             <div className="bg-blue-50 p-4 rounded-lg text-sm text-gray-700">
               <p className="font-semibold mb-1">💡 Tip</p>
-              <p>Be specific about your preferences to find the best matches!</p>
+              <p>Be specific about your ride preferences to match with the right people!</p>
             </div>
 
             <div className="flex gap-4 pt-4">
@@ -175,5 +198,22 @@ export default function CreateGroupPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function CreateGroupPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary-600 border-r-transparent"></div>
+            <p className="text-gray-500 mt-4">Loading...</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <CreateGroupForm />
+    </Suspense>
   );
 }

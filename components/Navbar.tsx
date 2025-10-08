@@ -9,10 +9,13 @@ export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const [userName, setUserName] = useState('');
+  const [userId, setUserId] = useState('');
 
   useEffect(() => {
     const name = localStorage.getItem('userName');
+    const id = localStorage.getItem('userId');
     if (name) setUserName(name);
+    if (id) setUserId(id);
   }, []);
 
   const handleLogout = () => {
@@ -22,41 +25,53 @@ export function Navbar() {
   };
 
   const navLinks = [
-    { href: '/feed', label: '🏠 Feed', icon: '🏠' },
-    { href: '/events', label: '📅 Events', icon: '📅' },
-    { href: '/messages', label: '💬 Messages', icon: '💬' },
+    { href: '/feed', label: 'Feed', icon: '🏠', mobileLabel: '🏠' },
+    { href: '/events', label: 'Events', icon: '📅', mobileLabel: '📅' },
+    { href: '/messages', label: 'Messages', icon: '💬', mobileLabel: '💬' },
   ];
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-40">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-40">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6">
+        <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Logo */}
-          <Link href="/feed" className="text-2xl font-bold gradient-bg bg-clip-text text-transparent">
-            🎉 Zorides
+          <Link href="/feed" className="text-xl sm:text-2xl font-bold gradient-bg bg-clip-text text-transparent flex-shrink-0">
+            🎉 <span className="hidden sm:inline">Zorides</span>
           </Link>
 
-          {/* Nav Links */}
-          <div className="flex items-center gap-2">
+          {/* Nav Links - Mobile optimized */}
+          <div className="flex items-center gap-1 sm:gap-2">
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href}>
                 <Button
                   variant={pathname === link.href ? 'primary' : 'ghost'}
                   size="sm"
+                  className="text-xs sm:text-sm px-2 sm:px-4"
                 >
-                  {link.label}
+                  <span className="sm:hidden">{link.mobileLabel}</span>
+                  <span className="hidden sm:inline">{link.label}</span>
                 </Button>
               </Link>
             ))}
           </div>
 
-          {/* User Menu */}
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">
-              Hi, <span className="font-semibold">{userName}</span>
-            </span>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              Logout
+          {/* User Menu - Mobile optimized */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {userId && (
+              <Link href={`/profile/${userId}`} className="hidden sm:block">
+                <span className="text-sm text-gray-600 hover:text-primary-600 cursor-pointer">
+                  Hi, <span className="font-semibold">{userName}</span>
+                </span>
+              </Link>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleLogout}
+              className="text-xs sm:text-sm px-2 sm:px-4"
+            >
+              <span className="sm:hidden">👋</span>
+              <span className="hidden sm:inline">Logout</span>
             </Button>
           </div>
         </div>
