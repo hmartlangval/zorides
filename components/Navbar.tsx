@@ -10,17 +10,27 @@ export function Navbar() {
   const pathname = usePathname();
   const [userName, setUserName] = useState('');
   const [userId, setUserId] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const name = localStorage.getItem('userName');
     const id = localStorage.getItem('userId');
+    const userDataStr = localStorage.getItem('user');
+    
     if (name) setUserName(name);
     if (id) setUserId(id);
+    
+    // V1.2 - Check if user is admin
+    if (userDataStr) {
+      const userData = JSON.parse(userDataStr);
+      setIsAdmin(userData.email === 'admin@system.internal');
+    }
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('userId');
     localStorage.removeItem('userName');
+    localStorage.removeItem('user');
     router.push('/login');
   };
 
@@ -29,6 +39,11 @@ export function Navbar() {
     { href: '/events', label: 'Events', icon: '📅', mobileLabel: '📅' },
     { href: '/messages', label: 'Messages', icon: '💬', mobileLabel: '💬' },
   ];
+  
+  // V1.2 - Add admin link if user is admin
+  if (isAdmin) {
+    navLinks.push({ href: '/admin', label: 'Admin', icon: '🔧', mobileLabel: '🔧' });
+  }
 
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-40">

@@ -55,3 +55,13 @@ Update 1.1:
 6. Remove age for any group: age is not restriction
 
 7. Make any profile name hoverable or clickable, show summary of their profile. On click, visit their profile.
+
+Update 1.2:
+1. Authors have permission to modify their creations
+    > edit
+    > delete
+    > change state to open/closed, etc.
+2. Create an admin screen, where admin has all rights for all contents.
+    > manage users
+    > manage contents
+    > create hardcoded username: admin. Password is to be defined in the .env ADMIN_PWD.

@@ -37,6 +37,7 @@ export default function LoginPage() {
       // Store user session
       localStorage.setItem('userId', data.user.id);
       localStorage.setItem('userName', data.user.name);
+      localStorage.setItem('user', JSON.stringify(data.user)); // V1.2 - Store full user for admin check
       
       router.push('/feed');
     } catch (err) {
@@ -94,6 +95,7 @@ export default function LoginPage() {
               <p className="font-semibold mb-1">Demo Accounts:</p>
               <p className="text-xs">alice@demo.com / password123</p>
               <p className="text-xs">bob@demo.com / password123</p>
+              <p className="text-xs font-semibold text-purple-700 mt-2">Admin: admin@system.internal / (see .env ADMIN_PWD)</p>
             </div>
           </form>
         </CardContent>

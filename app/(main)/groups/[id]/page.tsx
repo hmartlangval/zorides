@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import { Textarea } from '@/components/ui/Textarea';
+import { Input } from '@/components/ui/Input';
 import { AttendantGroup, GroupMember } from '@/types';
 
 export default function GroupDetailPage({ params }: { params: { id: string } }) {
@@ -14,6 +16,9 @@ export default function GroupDetailPage({ params }: { params: { id: string } }) 
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editPlanDescription, setEditPlanDescription] = useState('');
+  const [editMaxPeople, setEditMaxPeople] = useState(0);
 
   useEffect(() => {
     const userId = localStorage.getItem('userId');
@@ -34,12 +39,89 @@ export default function GroupDetailPage({ params }: { params: { id: string } }) 
         console.log('Group data:', data);
         console.log('Members:', data.members);
         setGroup(data.group);
+        setEditPlanDescription(data.group.planDescription);
+        setEditMaxPeople(data.group.maxPeople);
         setMembers(data.members || []);
       }
     } catch (error) {
       console.error('Failed to fetch group:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // V1.2 - Edit group (creator only)
+  const handleEditGroup = async () => {
+    if (!editPlanDescription.trim() || editMaxPeople < 1) return;
+
+    try {
+      const res = await fetch('/api/groups', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          groupId: group?.id,
+          userId: currentUserId,
+          planDescription: editPlanDescription,
+          maxPeople: editMaxPeople,
+        }),
+      });
+
+      if (res.ok) {
+        setIsEditing(false);
+        fetchGroupDetails();
+        alert('Group updated successfully');
+      } else {
+        alert('Failed to update group');
+      }
+    } catch (error) {
+      console.error('Failed to update group:', error);
+      alert('Failed to update group');
+    }
+  };
+
+  // V1.2 - Delete group (creator only)
+  const handleDeleteGroup = async () => {
+    if (!confirm('Are you sure you want to delete this group?')) return;
+
+    try {
+      const res = await fetch(`/api/groups?groupId=${group?.id}&userId=${currentUserId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        alert('Group deleted successfully');
+        router.push(`/events/${group?.eventId}`);
+      } else {
+        alert('Failed to delete group');
+      }
+    } catch (error) {
+      console.error('Failed to delete group:', error);
+      alert('Failed to delete group');
+    }
+  };
+
+  // V1.2 - Change group status (creator only)
+  const handleChangeStatus = async (newStatus: string) => {
+    try {
+      const res = await fetch('/api/groups', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          groupId: group?.id,
+          userId: currentUserId,
+          status: newStatus,
+        }),
+      });
+
+      if (res.ok) {
+        fetchGroupDetails();
+        alert('Group status updated successfully');
+      } else {
+        alert('Failed to update group status');
+      }
+    } catch (error) {
+      console.error('Failed to update group status:', error);
+      alert('Failed to update group status');
     }
   };
 
@@ -122,15 +204,57 @@ export default function GroupDetailPage({ params }: { params: { id: string } }) 
                 </Link>
               )}
             </div>
-            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
-              {group.status}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+                {group.status}
+              </span>
+              {/* V1.2 - Creator actions */}
+              {isCreator && (
+                <div className="flex gap-2">
+                  {isEditing ? (
+                    <>
+                      <Button size="sm" onClick={handleEditGroup}>Save</Button>
+                      <Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>
+                        Edit
+                      </Button>
+                      <select
+                        value={group.status}
+                        onChange={(e) => handleChangeStatus(e.target.value)}
+                        className="px-2 py-1 border rounded text-sm"
+                      >
+                        <option value="OPEN">Open</option>
+                        <option value="FILLED">Filled</option>
+                        <option value="CLOSED">Closed</option>
+                      </select>
+                      <Button size="sm" variant="secondary" onClick={handleDeleteGroup}>
+                        Delete
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
             <h3 className="font-semibold text-lg mb-2">Plan Description</h3>
-            <p className="text-gray-700 whitespace-pre-line">{group.planDescription}</p>
+            {isEditing ? (
+              <Textarea
+                value={editPlanDescription}
+                onChange={(e) => setEditPlanDescription(e.target.value)}
+                placeholder="Plan description"
+                rows={4}
+              />
+            ) : (
+              <p className="text-gray-700 whitespace-pre-line">{group.planDescription}</p>
+            )}
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
@@ -146,7 +270,20 @@ export default function GroupDetailPage({ params }: { params: { id: string } }) 
                 {group.rideMode && (
                   <p>🚗 <strong>Ride Mode:</strong> {group.rideMode.replace('_', ' ')}</p>
                 )}
-                <p>👤 <strong>Max People:</strong> {group.maxPeople}</p>
+                {isEditing ? (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Max People:</label>
+                    <Input
+                      type="number"
+                      value={editMaxPeople}
+                      onChange={(e) => setEditMaxPeople(parseInt(e.target.value) || 0)}
+                      min={1}
+                      className="w-24"
+                    />
+                  </div>
+                ) : (
+                  <p>👤 <strong>Max People:</strong> {group.maxPeople}</p>
+                )}
               </div>
             </div>
 
@@ -160,7 +297,7 @@ export default function GroupDetailPage({ params }: { params: { id: string } }) 
             </div>
           </div>
 
-          {canJoin && (
+          {canJoin && !isEditing && (
             <div className="pt-4">
               <Button 
                 onClick={handleJoinGroup} 

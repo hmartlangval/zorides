@@ -12,12 +12,16 @@ interface PostCardProps {
   currentUserId: string;
   onReaction?: () => void;
   onComment?: () => void;
+  onDelete?: () => void;
+  onUpdate?: () => void;
 }
 
-export function PostCard({ post, currentUserId, onReaction, onComment }: PostCardProps) {
+export function PostCard({ post, currentUserId, onReaction, onComment, onDelete, onUpdate }: PostCardProps) {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content);
 
   const helpFindFriendCount = post.reactions?.filter(r => r.type === 'HELP_FIND_FRIEND').length || 0;
   const hitMeUpCount = post.reactions?.filter(r => r.type === 'HIT_ME_UP').length || 0;
@@ -71,22 +75,107 @@ export function PostCard({ post, currentUserId, onReaction, onComment }: PostCar
     }
   };
 
+  // V1.2 - Edit post (author only)
+  const handleEdit = async () => {
+    if (!editContent.trim()) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/posts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: post.id,
+          userId: currentUserId,
+          content: editContent,
+        }),
+      });
+
+      if (res.ok) {
+        setIsEditing(false);
+        if (onUpdate) onUpdate();
+      } else {
+        alert('Failed to update post');
+      }
+    } catch (error) {
+      console.error('Failed to update post:', error);
+      alert('Failed to update post');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // V1.2 - Delete post (author only)
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this post?')) return;
+
+    try {
+      const res = await fetch(`/api/posts?postId=${post.id}&userId=${currentUserId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        if (onDelete) onDelete();
+      } else {
+        alert('Failed to delete post');
+      }
+    } catch (error) {
+      console.error('Failed to delete post:', error);
+      alert('Failed to delete post');
+    }
+  };
+
+  const isAuthor = post.userId === currentUserId;
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-semibold text-lg">
-            {post.user?.name?.[0] || '?'}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-semibold text-lg">
+              {post.user?.name?.[0] || '?'}
+            </div>
+            <div>
+              <p className="font-semibold">{post.user?.name}</p>
+              <p className="text-sm text-gray-500">{formatDate(post.createdAt)}</p>
+            </div>
           </div>
-          <div>
-            <p className="font-semibold">{post.user?.name}</p>
-            <p className="text-sm text-gray-500">{formatDate(post.createdAt)}</p>
-          </div>
+          {/* V1.2 - Edit/Delete buttons for author */}
+          {isAuthor && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className="text-sm text-blue-600 hover:text-blue-800 px-3 py-1 rounded border border-blue-600 hover:bg-blue-50"
+              >
+                {isEditing ? 'Cancel' : 'Edit'}
+              </button>
+              <button
+                onClick={handleDelete}
+                className="text-sm text-red-600 hover:text-red-800 px-3 py-1 rounded border border-red-600 hover:bg-red-50"
+              >
+                Delete
+              </button>
+            </div>
+          )}
         </div>
       </CardHeader>
       
       <CardContent className="space-y-4">
-        <p className="whitespace-pre-line">{post.content}</p>
+        {isEditing ? (
+          <div className="space-y-2">
+            <Textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              rows={4}
+              className="w-full"
+            />
+            <Button onClick={handleEdit} disabled={!editContent.trim() || submitting}>
+              Save Changes
+            </Button>
+          </div>
+        ) : (
+          <p className="whitespace-pre-line">{post.content}</p>
+        )}
 
         {/* Media */}
         {post.mediaUrls && post.mediaUrls.length > 0 && (

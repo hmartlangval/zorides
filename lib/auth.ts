@@ -37,6 +37,41 @@ export const DEV_USERS = [
 
 // Simple session management (V1 - hardcoded validation)
 export async function validateCredentials(email: string, password: string) {
+  // Check for admin login (V1.2) - accept both 'admin' and 'admin@system.internal'
+  if (email === 'admin' || email === 'admin@system.internal') {
+    console.log('[AUTH] Admin login attempt detected');
+    console.log('[AUTH] ADMIN_PWD is set:', !!process.env.ADMIN_PWD);
+    
+    if (!process.env.ADMIN_PWD) {
+      console.error('[AUTH] ERROR: ADMIN_PWD environment variable is not set!');
+      console.error('[AUTH] Please create a .env.local file with: ADMIN_PWD=your_password');
+      return null;
+    }
+    
+    if (password === process.env.ADMIN_PWD) {
+      console.log('[AUTH] Admin password matched successfully');
+      // Return a special admin user object
+      let adminUser = await prisma.user.findUnique({ where: { email: 'admin@system.internal' } });
+      
+      if (!adminUser) {
+        console.log('[AUTH] Creating admin user for first time');
+        const hashedPassword = await bcrypt.hash(password, 10);
+        adminUser = await prisma.user.create({
+          data: {
+            email: 'admin@system.internal',
+            password: hashedPassword,
+            name: 'System Administrator',
+          }
+        });
+      }
+      
+      return adminUser;
+    } else {
+      console.log('[AUTH] Admin password did not match');
+      return null;
+    }
+  }
+
   // Check hardcoded users first
   const devUser = DEV_USERS.find(u => u.email === email && u.password === password);
   
@@ -73,6 +108,11 @@ export async function validateCredentials(email: string, password: string) {
   const isValid = await bcrypt.compare(password, user.password);
   
   return isValid ? user : null;
+}
+
+// Check if user is admin (V1.2)
+export function isAdmin(email: string) {
+  return email === 'admin@system.internal';
 }
 
 export async function registerUser(data: {

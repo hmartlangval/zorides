@@ -92,3 +92,109 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// V1.2 - Update post (author only)
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { postId, userId, content, mediaUrls } = body;
+
+    if (!postId || !userId) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // Verify ownership
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+    });
+
+    if (!post) {
+      return NextResponse.json(
+        { error: 'Post not found' },
+        { status: 404 }
+      );
+    }
+
+    if (post.userId !== userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized - not the post author' },
+        { status: 403 }
+      );
+    }
+
+    const updatedPost = await prisma.post.update({
+      where: { id: postId },
+      data: {
+        content: content || post.content,
+        mediaUrls: mediaUrls !== undefined ? mediaUrls : post.mediaUrls,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({ success: true, post: updatedPost });
+  } catch (error) {
+    console.error('Post update error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update post' },
+      { status: 500 }
+    );
+  }
+}
+
+// V1.2 - Delete post (author only)
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const postId = searchParams.get('postId');
+    const userId = searchParams.get('userId');
+
+    if (!postId || !userId) {
+      return NextResponse.json(
+        { error: 'Missing required parameters' },
+        { status: 400 }
+      );
+    }
+
+    // Verify ownership
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+    });
+
+    if (!post) {
+      return NextResponse.json(
+        { error: 'Post not found' },
+        { status: 404 }
+      );
+    }
+
+    if (post.userId !== userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized - not the post author' },
+        { status: 403 }
+      );
+    }
+
+    await prisma.post.delete({
+      where: { id: postId },
+    });
+
+    return NextResponse.json({ success: true, message: 'Post deleted' });
+  } catch (error) {
+    console.error('Post deletion error:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete post' },
+      { status: 500 }
+    );
+  }
+}
